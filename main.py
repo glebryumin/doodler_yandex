@@ -5,7 +5,7 @@ from random import randint
 # инициализация окна, шрифта, счётчика времени
 pg.init()
 size = WIDTH, HEIGHT = 400, 500
-FPS = 15
+FPS = 60
 font = pg.font.Font(None, 16)
 clock = pg.time.Clock()
 screen = pg.display.set_mode(size)
@@ -25,7 +25,7 @@ class Player(pg.sprite.Sprite):
         # подгоняем картинку под размер игрока
         self.image = pg.transform.scale(player_img, (90, 70))
         # выставляем размеры и позицию игрока
-        self.rect = pg.rect.Rect()
+        self.rect = self.image.get_rect()
         print(self.rect.bottomright, self.rect.bottomleft, self.rect.bottom, self.rect.topleft, self.rect.topright, self.rect.top)
         self.rect.x, self.rect.y = x, y
         # задаём высоту прыжка
@@ -38,7 +38,7 @@ class Player(pg.sprite.Sprite):
         self.gravity = 0.4
         # сторону движения
         self.side = None
-        #состояние прыжка
+        # состояние прыжка
         self.jump = False
 
     # функция обновления положения игрока
@@ -81,7 +81,7 @@ class Camera:
     def __init__(self):
         self.max_y = -1
         self.dy = 0
-        self.target_y = 400
+        self.target_y = 0
 
 
     # сдвинуть объект obj на смещение камеры
@@ -91,15 +91,18 @@ class Camera:
     # позиционировать камеру на объекте target
     def update(self, target):
         self.dy = -(target.rect.y + target.rect.h // 2 - HEIGHT // 2)
-        if target.rect.y - self.target_y >= 250:
+        print(target.rect.y - self.target_y)
+        if 0 < target.rect.y - self.target_y < 250:
             self.dy = 0
-            self.target_y = target.rect.y
+        self.target_y = target.rect.y
+
 
 
 
 player = Player(170, 400, all_sprites)
 platforms = [Platform(175, 480, all_tiles, all_sprites), Platform(175, 300, all_tiles, all_sprites),
-             Platform(175, 120, all_tiles, all_sprites), Platform(175, 480, all_tiles, all_sprites)]
+             Platform(175, 120, all_tiles, all_sprites), Platform(175, -60, all_tiles, all_sprites),
+             Platform(175, -240, all_tiles, all_sprites)]
 camera = Camera()
 # игровой цикл
 
