@@ -38,7 +38,7 @@ class Player(pg.sprite.Sprite):
         self.gravity = 0.4
         # сторону движения
         self.side = None
-        #
+        #состояние прыжка
         self.jump = False
 
     # функция обновления положения игрока
