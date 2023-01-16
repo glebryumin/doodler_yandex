@@ -6,14 +6,15 @@ from random import randint
 pg.init()
 size = WIDTH, HEIGHT = 400, 500
 FPS = 60
-font = pg.font.Font(None, 16)
+font = pg.font.Font(None, 36)
 clock = pg.time.Clock()
 screen = pg.display.set_mode(size)
 pg.display.set_caption('Doodler')
 player_img = func.load_image('doodler.png')
 all_sprites = pg.sprite.Group()
 all_tiles = pg.sprite.Group()
-runnning = True
+running = True
+lose_f = False
 new_platform = False
 
 
@@ -67,6 +68,14 @@ class Player(pg.sprite.Sprite):
     def get_y(self):
         return self.rect.y
 
+    def get_x(self):
+        return self.rect.x
+
+    def set_x(self, x):
+        self.rect.x = x
+
+    def set_y(self, y):
+        self.rect.y = y
 
 
 # инициализация класса платформы
@@ -83,7 +92,6 @@ class Camera:
     def __init__(self):
         self.max_y = -1
         self.dy = 0
-        self.target_y = 0
 
     # сдвинуть объект obj на смещение камеры
     def apply(self, obj):
@@ -97,13 +105,12 @@ class Camera:
 
 
 player = Player(170, 400, all_sprites)
-platforms = [Platform(175, 480, all_tiles, all_sprites), Platform(120, 300, all_tiles, all_sprites),
-             Platform(250, 120, all_tiles, all_sprites), Platform(175, -60, all_tiles, all_sprites),
-             Platform(540, -240, all_tiles, all_sprites)]
+Platform(175, 480, all_tiles, all_sprites)
+for i in range(10):
+    Platform(randint(0, WIDTH - 40), 480 - (150 * (i + 1)), all_tiles, all_sprites)
 camera = Camera()
 # игровой цикл
-
-while runnning:
+while running:
     # единица времени
     tick = clock.tick(FPS)
     # сторона прыжка (лево или право)
@@ -113,15 +120,14 @@ while runnning:
     all_sprites.draw(screen)
     # обновляем положение камеры
     camera.update(player)
-    # пробегаемся по платформам и отрисовываем их
-    for i in range(len(platforms)):
-        all_tiles.draw(screen)
-        # если нужна новая платформа, то создаём её
-        if new_platform:
-            platforms.append(Platform(randint(0, WIDTH - 40), -randint(10, 50), all_tiles, all_sprites))
-            new_platform = False
-        if platforms[i].rect.y > HEIGHT + 100:
-            platforms[i].kill()
+    # если нужна новая платформа, то создаём её
+    if new_platform:
+        Platform(randint(0, WIDTH - 40), -randint(10, 35), all_tiles, all_sprites)
+        new_platform = False
+
+    for tile in all_tiles:
+        if tile.rect.y >= HEIGHT * 2:
+            tile.kill()
 
     # передвигаем все спрайты относительно игрока при помощи камеры
     for sprite in all_sprites:
@@ -143,10 +149,25 @@ while runnning:
                 side = 0
             elif event.key in (pg.K_a, pg.K_LEFT):
                 side = 0
+        if event.type == pg.MOUSEBUTTONDOWN:
+            if lose_f:
+                lose_f = False
+                player.set_y(480)
+                player.set_x(170)
+
     # передвигаем игрока в сторону
     player.update(side)
-    if player.get_y() < 250:
-        new_platform = True
+
+    if player.get_x() > WIDTH + 45:
+        player.set_x(0)
+
+    elif player.get_x() < - 45:
+        player.set_x(WIDTH)
+
+    if player.get_y() > HEIGHT:
+        text = font.render('Вы проиграли!', True, 'red')
+        screen.blit(text, (WIDTH // 2 - text.get_width() // 2, HEIGHT // 2 - text.get_height() // 2))
+        lose_f = True
     # обновляем кадр
     pg.display.flip()
 # заканчиваем программу
