@@ -6,16 +6,15 @@ from random import randint
 pg.init()
 size = WIDTH, HEIGHT = 400, 500
 FPS = 60
-font = pg.font.Font(None, 36)
+fonts = [pg.font.Font(None, 30), pg.font.Font(None, 25)]
 clock = pg.time.Clock()
 screen = pg.display.set_mode(size)
-pg.display.set_caption('Doodler')
+pg.display.set_caption('Doodle Jump')
 player_img = func.load_image('doodler.png')
 all_sprites = pg.sprite.Group()
 all_tiles = pg.sprite.Group()
 running = True
 lose_f = False
-new_platform = False
 
 
 # инициализация класса игрока
@@ -27,7 +26,9 @@ class Player(pg.sprite.Sprite):
         self.image = pg.transform.scale(player_img, (90, 70))
         # выставляем размеры и позицию игрока
         self.rect = self.image.get_rect()
-        self.rect.x, self.rect.y = x, y
+        self.rect.x = x
+        self.rect.y = y
+        self.rect.width -= 20
         # задаём высоту прыжка
         self.jump_height = 20
         # горизонтальная скорость
@@ -62,8 +63,11 @@ class Player(pg.sprite.Sprite):
             self.rect.x += 0
         elif self.side == 'left':
             self.rect.x -= self.x_speed
+            self.image = pg.transform.flip(pg.transform.scale(player_img, (90, 70)), 1, 0)
         elif self.side == 'right':
             self.rect.x += self.x_speed
+            self.image = pg.transform.scale(player_img, (90, 70))
+
 
     def get_y(self):
         return self.rect.y
@@ -87,6 +91,17 @@ class Platform(pg.sprite.Sprite):
         self.rect = pg.Rect(x, y, 60, 10)
 
 
+def generate_platforms():
+    Platform(175, 480, all_tiles, all_sprites)
+    for i in range(10):
+        Platform(randint(0, WIDTH - 40), 480 - (100 * (i + 1)), all_tiles, all_sprites)
+
+
+def kill_platforms():
+    for tile in all_tiles:
+        tile.kill()
+
+
 class Camera:
     # зададим начальный сдвиг камеры
     def __init__(self):
@@ -105,9 +120,7 @@ class Camera:
 
 
 player = Player(170, 400, all_sprites)
-Platform(175, 480, all_tiles, all_sprites)
-for i in range(10):
-    Platform(randint(0, WIDTH - 40), 480 - (150 * (i + 1)), all_tiles, all_sprites)
+generate_platforms()
 camera = Camera()
 # игровой цикл
 while running:
@@ -115,60 +128,77 @@ while running:
     tick = clock.tick(FPS)
     # сторона прыжка (лево или право)
     side = None
+
+    last_tile = None
     # заполняем экран белым и отрисовываем все спрайты
     screen.fill('white')
     all_sprites.draw(screen)
     # обновляем положение камеры
     camera.update(player)
-    # если нужна новая платформа, то создаём её
-    if new_platform:
-        Platform(randint(0, WIDTH - 40), -randint(10, 35), all_tiles, all_sprites)
-        new_platform = False
+    # пробегаемя по платформам и решаем, убивать конкретную платформу или создать новую
 
     for tile in all_tiles:
-        if tile.rect.y >= HEIGHT * 2:
+        if tile.rect.y >= HEIGHT:
             tile.kill()
+        last_tile = tile
+    if last_tile.rect.y > 50:
+        Platform(randint(0, WIDTH - 60), -randint(10, 50), all_tiles, all_sprites)
+
 
     # передвигаем все спрайты относительно игрока при помощи камеры
     for sprite in all_sprites:
         camera.apply(sprite)
     # пробегаемся по событиям
     for event in pg.event.get():
-        # если выход, то завершаем цыкл
+        # если выход, то завершаем цикл
         if event.type == pg.QUIT:
             runnning = False
+            # заканчиваем программу
+            func.terminate()
         # если кнопка нажата, то выбираем сторону движения
         if event.type == pg.KEYDOWN:
             if event.key in (pg.K_d, pg.K_RIGHT):
                 side = 'right'
             elif event.key in (pg.K_a, pg.K_LEFT):
                 side = 'left'
+            if lose_f:
+                kill_platforms()
+                lose_f = False
+                player.set_y(480)
+                player.set_x(170)
+                generate_platforms()
         # если кнопка отжата, то приравниваем сторону к нулю
         if event.type == pg.KEYUP:
             if event.key in (pg.K_d, pg.K_RIGHT):
                 side = 0
             elif event.key in (pg.K_a, pg.K_LEFT):
                 side = 0
-        if event.type == pg.MOUSEBUTTONDOWN:
-            if lose_f:
-                lose_f = False
-                player.set_y(480)
-                player.set_x(170)
+
 
     # передвигаем игрока в сторону
     player.update(side)
 
     if player.get_x() > WIDTH + 45:
-        player.set_x(0)
+        player.set_x(-45)
 
     elif player.get_x() < - 45:
         player.set_x(WIDTH)
 
-    if player.get_y() > HEIGHT:
-        text = font.render('Вы проиграли!', True, 'red')
-        screen.blit(text, (WIDTH // 2 - text.get_width() // 2, HEIGHT // 2 - text.get_height() // 2))
+    if player.get_y() - player.rect.height > HEIGHT:
+        texts = ['Вы проиграли!', 'Нажмите любую клавищу для перезапуска']
+        text_coord = 250
+        font = 0
+        for line in texts:
+            string_rendered = fonts[font].render(line, 1, 'red')
+            intro_rect = string_rendered.get_rect()
+            text_coord += 10
+            intro_rect.top = text_coord
+            intro_rect.x = 10
+            text_coord += intro_rect.height
+            screen.blit(string_rendered, intro_rect)
+            font += 1
         lose_f = True
     # обновляем кадр
     pg.display.flip()
-# заканчиваем программу
-func.terminate()
+
+
