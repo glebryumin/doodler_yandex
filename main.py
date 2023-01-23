@@ -6,7 +6,7 @@ from random import randint
 pg.init()
 size = WIDTH, HEIGHT = 400, 500
 FPS = 60
-fonts = [pg.font.Font(None, 30), pg.font.Font(None, 25)]
+fonts = [pg.font.Font(None, 30), pg.font.Font(None, 25), pg.font.Font(None, 20)]
 clock = pg.time.Clock()
 screen = pg.display.set_mode(size)
 pg.display.set_caption('Doodle Jump')
@@ -41,6 +41,8 @@ class Player(pg.sprite.Sprite):
         self.side = None
         # состояние прыжка
         self.jump = False
+        # счётчик очков
+        self.score = 0
 
     # функция обновления положения игрока
     def update(self, side):
@@ -56,6 +58,8 @@ class Player(pg.sprite.Sprite):
         # если временная высоту больше нуля, то игрок не в прыжке
         if self.temp_y >= 0:
             self.jump = False
+        else:
+            self.score += abs(int(self.temp_y))
         # определяем сторону движения
         self.side = side if side is not None else self.side
         # по стороне движения двигаем персонажа
@@ -80,6 +84,12 @@ class Player(pg.sprite.Sprite):
 
     def set_y(self, y):
         self.rect.y = y
+
+    def get_score(self):
+        return self.score
+
+    def set_score(self, score):
+        self.score = score
 
 
 # инициализация класса платформы
@@ -144,10 +154,14 @@ while running:
     if last_tile.rect.y > 50:
         Platform(randint(0, WIDTH - 60), -randint(10, 50), all_tiles, all_sprites)
 
-
     # передвигаем все спрайты относительно игрока при помощи камеры
     for sprite in all_sprites:
         camera.apply(sprite)
+
+    text = str(player.get_score())
+    score_rendered = fonts[-1].render(text, True, 'black')
+    screen.blit(score_rendered, (5, 5))
+
     # пробегаемся по событиям
     for event in pg.event.get():
         # если выход, то завершаем цикл
@@ -162,6 +176,7 @@ while running:
             elif event.key in (pg.K_a, pg.K_LEFT):
                 side = 'left'
             if lose_f:
+                player.set_score(0)
                 kill_platforms()
                 lose_f = False
                 player.set_y(480)
@@ -173,7 +188,6 @@ while running:
                 side = 0
             elif event.key in (pg.K_a, pg.K_LEFT):
                 side = 0
-
 
     # передвигаем игрока в сторону
     player.update(side)
@@ -199,6 +213,7 @@ while running:
             font += 1
         lose_f = True
     # обновляем кадр
+
     pg.display.flip()
 
 
