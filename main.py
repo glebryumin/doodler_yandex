@@ -89,18 +89,18 @@ class Platform(pg.sprite.Sprite):
         self.image = pg.Surface((60, 10))
         pg.draw.rect(self.image, 'black', (0, 0, 60, 10))
         self.rect = pg.Rect(x, y, 60, 10)
-        self.moveable = True if randint(0, 10) == 1 else False
-        self.x_speed = 0.2
-        self.borders = (self.rect.x - 100 if self.rect.x - 100 > 60 else 60,
-                        self.rect.x + 100 if self.rect.x + 100 < HEIGHT - 60 else HEIGHT - 60)
+        self.moveable = True  # if randint(0, 10) == 1 else False
+        self.x_speed = -0.2  # if randint(0, 10) in (1, 2, 3, 4, 5) else 0.2
+        self.borders = (self.rect.x - 100 if self.rect.x - 100 >= 0 else 0,
+                        self.rect.x + 100 if self.rect.x + 100 <= HEIGHT else HEIGHT)
 
     def update(self):
         if self.moveable:
             self.rect.x += self.x_speed
-            if self.rect.x <= self.borders[0] + 60:
-                self.x_speed = -0.2
-            elif self.rect.x >= self.borders[1]:
-                self.x_speed = 0.2
+        if self.rect.x == self.borders[0]:
+            self.x_speed = 0.2
+        elif self.rect.x == self.borders[-1]:
+            self.x_speed = -0.2
 
 
 def generate_platforms():
