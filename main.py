@@ -41,8 +41,6 @@ class Player(pg.sprite.Sprite):
         self.side = None
         # состояние прыжка
         self.jump = False
-        # счётчик очков
-        self.score = 0
 
     # функция обновления положения игрока
     def update(self, side):
@@ -58,8 +56,6 @@ class Player(pg.sprite.Sprite):
         # если временная высоту больше нуля, то игрок не в прыжке
         if self.temp_y >= 0:
             self.jump = False
-        else:
-            self.score += abs(int(self.temp_y))
         # определяем сторону движения
         self.side = side if side is not None else self.side
         # по стороне движения двигаем персонажа
@@ -67,7 +63,7 @@ class Player(pg.sprite.Sprite):
             self.rect.x += 0
         elif self.side == 'left':
             self.rect.x -= self.x_speed
-            self.image = pg.transform.flip(pg.transform.scale(player_img, (90, 70)), 1, 0)
+            self.image = pg.transform.flip(pg.transform.scale(player_img, (90, 70)), True, False)
         elif self.side == 'right':
             self.rect.x += self.x_speed
             self.image = pg.transform.scale(player_img, (90, 70))
@@ -85,12 +81,6 @@ class Player(pg.sprite.Sprite):
     def set_y(self, y):
         self.rect.y = y
 
-    def get_score(self):
-        return self.score
-
-    def set_score(self, score):
-        self.score = score
-
 
 # инициализация класса платформы
 class Platform(pg.sprite.Sprite):
@@ -99,6 +89,18 @@ class Platform(pg.sprite.Sprite):
         self.image = pg.Surface((60, 10))
         pg.draw.rect(self.image, 'black', (0, 0, 60, 10))
         self.rect = pg.Rect(x, y, 60, 10)
+        self.moveable = True if randint(0, 10) == 1 else False
+        self.x_speed = 0.2
+        self.borders = (self.rect.x - 100 if self.rect.x - 100 > 60 else 60,
+                        self.rect.x + 100 if self.rect.x + 100 < HEIGHT - 60 else HEIGHT - 60)
+
+    def update(self):
+        if self.moveable:
+            self.rect.x += self.x_speed
+            if self.rect.x <= self.borders[0] + 60:
+                self.x_speed = -0.2
+            elif self.rect.x >= self.borders[1]:
+                self.x_speed = 0.2
 
 
 def generate_platforms():
@@ -117,6 +119,7 @@ class Camera:
     def __init__(self):
         self.max_y = -1
         self.dy = 0
+        self.score = 0
 
     # сдвинуть объект obj на смещение камеры
     def apply(self, obj):
@@ -127,6 +130,13 @@ class Camera:
         self.dy = -(target.rect.y + target.rect.h // 2 - HEIGHT // 2)
         if self.dy < 0:
             self.dy = 0
+        self.score += self.dy
+
+    def get_score(self):
+        return self.score
+
+    def set_score(self, score):
+        self.score = score
 
 
 player = Player(170, 400, all_sprites)
@@ -158,7 +168,7 @@ while running:
     for sprite in all_sprites:
         camera.apply(sprite)
 
-    text = str(player.get_score())
+    text = str(camera.get_score())
     score_rendered = fonts[-1].render(text, True, 'black')
     screen.blit(score_rendered, (5, 5))
 
@@ -176,7 +186,7 @@ while running:
             elif event.key in (pg.K_a, pg.K_LEFT):
                 side = 'left'
             if lose_f:
-                player.set_score(0)
+                camera.set_score(0)
                 kill_platforms()
                 lose_f = False
                 player.set_y(480)
@@ -191,6 +201,8 @@ while running:
 
     # передвигаем игрока в сторону
     player.update(side)
+
+    all_tiles.update()
 
     if player.get_x() > WIDTH + 45:
         player.set_x(-45)
