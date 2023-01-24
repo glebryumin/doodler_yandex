@@ -98,6 +98,7 @@ class Platform(pg.sprite.Sprite):
         #
         if self.moveable:
             self.rect.x += self.x_speed
+            #
             if self.rect.x <= self.borders[0]:
                 self.x_speed = 1
             elif self.rect.x >= self.borders[1]:
