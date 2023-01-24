@@ -95,6 +95,7 @@ class Platform(pg.sprite.Sprite):
                         self.rect.x + 200 if self.rect.x + 200 <= HEIGHT else HEIGHT)
 
     def update(self):
+        #
         if self.moveable:
             self.rect.x += self.x_speed
             if self.rect.x <= self.borders[0]:
