@@ -25,9 +25,7 @@ class Player(pg.sprite.Sprite):
         # подгоняем картинку под размер игрока
         self.image = pg.transform.scale(player_img, (90, 70))
         # выставляем размеры и позицию игрока
-        self.rect = self.image.get_rect()
-        self.rect.x = x
-        self.rect.y = y
+        self.rect = pg.Rect(x + 10, y + 60, 70, 10)
         self.rect.width -= 20
         # задаём высоту прыжка
         self.jump_height = 20
@@ -60,7 +58,7 @@ class Player(pg.sprite.Sprite):
         self.side = side if side is not None else self.side
         # по стороне движения двигаем персонажа
         if side == 0:
-            self.rect.x += 0
+            pass
         elif self.side == 'left':
             self.rect.x -= self.x_speed
             self.image = pg.transform.flip(pg.transform.scale(player_img, (90, 70)), True, False)
