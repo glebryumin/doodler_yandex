@@ -10,7 +10,7 @@ fonts = [pg.font.Font(None, 30), pg.font.Font(None, 25), pg.font.Font(None, 20)]
 clock = pg.time.Clock()
 screen = pg.display.set_mode(size)
 pg.display.set_caption('Doodle Jump')
-player_img = func.load_image('doodler.png')
+player_img = pg.transform.scale(func.load_image('doodler.png'), (90, 70))
 all_sprites = pg.sprite.Group()
 all_tiles = pg.sprite.Group()
 running = True
@@ -23,10 +23,10 @@ class Player(pg.sprite.Sprite):
     def __init__(self, x, y, *groups):
         super().__init__(groups)
         # подгоняем картинку под размер игрока
-        self.image = pg.transform.scale(player_img, (90, 70))
+        self.image = player_img
         # выставляем размеры и позицию игрока
-        self.rect = pg.Rect(x + 10, y + 60, 70, 10)
-        self.rect.width -= 20
+        self.rect = self.image.get_rect()
+        self.rect.x, self.rect.y = x, y
         # задаём высоту прыжка
         self.jump_height = 20
         # горизонтальная скорость
@@ -36,14 +36,18 @@ class Player(pg.sprite.Sprite):
         # гравитацию
         self.gravity = 0.4
         # сторону движения
-        self.side = None
+        self.side = 0
         # состояние прыжка
         self.jump = False
 
     # функция обновления положения игрока
     def update(self, side):
         # если игрок касается платформы, то прыгаем, изменяя временную высоту
-        if pg.sprite.spritecollideany(self, all_tiles) and not self.jump:
+        platform_collided = pg.sprite.spritecollideany(self, all_tiles)
+        if platform_collided \
+                and pg.sprite.collide_mask(self, platform_collided)\
+                and 1 <= (self.get_y() + self.rect.height) - platform_collided.rect.y <= 15 \
+                and not self.jump:
             # изменяем временную высоту
             self.temp_y = -10
             self.jump = True
@@ -55,17 +59,14 @@ class Player(pg.sprite.Sprite):
         if self.temp_y >= 0:
             self.jump = False
         # определяем сторону движения
-        self.side = side if side is not None else self.side
+        if side is not None:
+            self.side = side
         # по стороне движения двигаем персонажа
-        if side == 0:
-            pass
-        elif self.side == 'left':
-            self.rect.x -= self.x_speed
+        self.rect.x += self.x_speed * self.side
+        if self.side == -1:
             self.image = pg.transform.flip(pg.transform.scale(player_img, (90, 70)), True, False)
-        elif self.side == 'right':
-            self.rect.x += self.x_speed
-            self.image = pg.transform.scale(player_img, (90, 70))
-
+        elif self.side == 1:
+            self.image = player_img
 
     def get_y(self):
         return self.rect.y
@@ -182,15 +183,16 @@ while running:
         # если кнопка нажата, то выбираем сторону движения
         if event.type == pg.KEYDOWN:
             if event.key in (pg.K_d, pg.K_RIGHT):
-                side = 'right'
+                side = 1
             elif event.key in (pg.K_a, pg.K_LEFT):
-                side = 'left'
+                side = -1
             if lose_f:
                 camera.set_score(0)
                 kill_platforms()
                 lose_f = False
-                player.set_y(480)
+                player.set_y(400)
                 player.set_x(170)
+                player.temp_y = 0
                 generate_platforms()
         # если кнопка отжата, то приравниваем сторону к нулю
         if event.type == pg.KEYUP:
@@ -204,11 +206,11 @@ while running:
 
     all_tiles.update()
 
-    if player.get_x() > WIDTH + 45:
+    if player.get_x() > WIDTH - 45:
         player.set_x(-45)
 
-    elif player.get_x() < - 45:
-        player.set_x(WIDTH)
+    elif player.get_x() < -45:
+        player.set_x(WIDTH - 45)
 
     if player.get_y() - player.rect.height > HEIGHT:
         texts = ['Вы проиграли!', 'Нажмите любую клавищу для перезапуска']
@@ -227,5 +229,3 @@ while running:
     # обновляем кадр
 
     pg.display.flip()
-
-
