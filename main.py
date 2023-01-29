@@ -4,7 +4,7 @@ from random import randint
 
 # инициализация окна, шрифта, счётчика времени
 pg.init()
-size = WIDTH, HEIGHT = 400, 500
+size = WIDTH, HEIGHT = 550, 700
 FPS = 60
 fonts = [pg.font.Font(None, 30), pg.font.Font(None, 25), pg.font.Font(None, 20)]
 clock = pg.time.Clock()
@@ -90,8 +90,8 @@ class Platform(pg.sprite.Sprite):
         self.rect = pg.Rect(x, y, 60, 10)
         self.moveable = True if randint(0, 10) == 1 else False
         self.x_speed = -1 if randint(0, 10) in (1, 2, 3, 4, 5) else 1
-        self.borders = (self.rect.x - 200 if self.rect.x - 200 >= 0 else 0,
-                        self.rect.x + 200 if self.rect.x + 200 <= HEIGHT else HEIGHT)
+        self.borders = (self.rect.x - 200 if self.rect.x - 200 >= 60 else 60,
+                        self.rect.x + 200 if self.rect.x + 200 <= HEIGHT - 60 else HEIGHT - 60)
 
     def update(self):
         #
@@ -105,9 +105,9 @@ class Platform(pg.sprite.Sprite):
 
 
 def generate_platforms():
-    Platform(175, 480, all_tiles, all_sprites)
-    for i in range(10):
-        Platform(randint(0, WIDTH - 40), 480 - (100 * (i + 1)), all_tiles, all_sprites)
+    Platform(175, 580, all_tiles, all_sprites)
+    for i in range(20):
+        Platform(randint(0, WIDTH - 40), 580 - (80 * (i + 1)), all_tiles, all_sprites)
 
 
 def kill_platforms():
@@ -140,7 +140,7 @@ class Camera:
         self.score = score
 
 
-player = Player(170, 400, all_sprites)
+player = Player(170, 500, all_sprites)
 generate_platforms()
 camera = Camera()
 # игровой цикл
@@ -162,8 +162,8 @@ while running:
         if tile.rect.y >= HEIGHT:
             tile.kill()
         last_tile = tile
-    if last_tile.rect.y > 50:
-        Platform(randint(0, WIDTH - 60), -randint(10, 50), all_tiles, all_sprites)
+    if last_tile.rect.y > 100:
+        Platform(randint(0, WIDTH - 60), -randint(0, 10), all_tiles, all_sprites)
 
     # передвигаем все спрайты относительно игрока при помощи камеры
     for sprite in all_sprites:
@@ -190,7 +190,7 @@ while running:
                 camera.set_score(0)
                 kill_platforms()
                 lose_f = False
-                player.set_y(400)
+                player.set_y(500)
                 player.set_x(170)
                 player.temp_y = 0
                 generate_platforms()
@@ -214,10 +214,10 @@ while running:
 
     if player.get_y() - player.rect.height > HEIGHT:
         texts = ['Вы проиграли!', 'Нажмите любую клавищу для перезапуска']
-        text_coord = 250
+        text_coord = 300
         font = 0
         for line in texts:
-            string_rendered = fonts[font].render(line, 1, 'red')
+            string_rendered = fonts[font].render(line, True, 'red')
             intro_rect = string_rendered.get_rect()
             text_coord += 10
             intro_rect.top = text_coord
