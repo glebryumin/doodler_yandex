@@ -4,15 +4,17 @@ from random import randint
 
 # инициализация окна, шрифта, счётчика времени
 pg.init()
-size = WIDTH, HEIGHT = 550, 700
+size = WIDTH, HEIGHT = 300, 400
 FPS = 60
-fonts = [pg.font.Font(None, 30), pg.font.Font(None, 25), pg.font.Font(None, 20)]
+fonts_lose = [pg.font.Font(None, 40), pg.font.Font(None, 35), pg.font.Font(None, 30)]
+fonts_start = [pg.font.Font(None, 30), pg.font.Font(None, 20)]
 clock = pg.time.Clock()
 screen = pg.display.set_mode(size)
 pg.display.set_caption('Doodle Jump')
 player_img = pg.transform.scale(func.load_image('doodler.png'), (90, 70))
 all_sprites = pg.sprite.Group()
 all_tiles = pg.sprite.Group()
+all_players = pg.sprite.Group()
 running = True
 lose_f = False
 
@@ -30,7 +32,7 @@ class Player(pg.sprite.Sprite):
         # задаём высоту прыжка
         self.jump_height = 20
         # горизонтальная скорость
-        self.x_speed = 5
+        self.x_speed = 7
         # изменение высоты
         self.temp_y = 0
         # гравитацию
@@ -45,7 +47,7 @@ class Player(pg.sprite.Sprite):
         # если игрок касается платформы, то прыгаем, изменяя временную высоту
         platform_collided = pg.sprite.spritecollideany(self, all_tiles)
         if platform_collided \
-                and pg.sprite.collide_mask(self, platform_collided)\
+                and pg.sprite.collide_mask(self, platform_collided) \
                 and 1 <= (self.get_y() + self.rect.height) - platform_collided.rect.y <= 15 \
                 and not self.jump:
             # изменяем временную высоту
@@ -115,6 +117,11 @@ def kill_platforms():
         tile.kill()
 
 
+def kill_player():
+    for pl in all_players:
+        pl.kill()
+
+
 class Camera:
     # зададим начальный сдвиг камеры
     def __init__(self):
@@ -127,11 +134,14 @@ class Camera:
         obj.rect.y += self.dy
 
     # позиционировать камеру на объекте target
-    def update(self, target):
+    def update(self, target, lose_f):
         self.dy = -(target.rect.y + target.rect.h // 2 - HEIGHT // 2)
         if self.dy < 0:
             self.dy = 0
-        self.score += self.dy
+        elif lose_f:
+            self.dy = -10000
+        else:
+            self.score += self.dy
 
     def get_score(self):
         return self.score
@@ -140,22 +150,72 @@ class Camera:
         self.score = score
 
 
-player = Player(170, 500, all_sprites)
-generate_platforms()
+def draw_grid():
+    pass
+
+
 camera = Camera()
+player = Player(170, 300, all_sprites, all_players)
+running_start_screen = True
+while running_start_screen:
+    tick = clock.tick(FPS)
+    Platform(175, 380, all_tiles, all_sprites)
+
+    screen.fill('white')
+    camera.update(player, lose_f)
+
+    for sprite in all_sprites:
+        camera.apply(sprite)
+
+    all_players.update(None)
+    all_players.draw(screen)
+    all_tiles.draw(screen)
+
+    texts = ['Doodle Jump', 'Нажмите любую клавишу для старта']
+    text_coord = 10
+    font = 0
+    for line in texts:
+        string_rendered = fonts_start[font].render(line, True, 'red')
+        intro_rect = string_rendered.get_rect()
+        text_coord += 10
+        intro_rect.top = text_coord
+        intro_rect.x = 10
+        text_coord += intro_rect.height
+        screen.blit(string_rendered, intro_rect)
+        font += 1
+    for event in pg.event.get():
+        if event.type == pg.KEYDOWN:
+            running_start_screen = False
+        if event.type == pg.QUIT:
+            running_start_screen = False
+            # заканчиваем программу
+            func.terminate()
+
+    pg.display.flip()
+
+kill_player()
+kill_platforms()
+WIDTH, HEIGHT = 550, 700
+size = WIDTH, HEIGHT
+pg.display.set_mode(size)
+player = Player(170, 500, all_sprites, all_players)
+camera = Camera()
+generate_platforms()
 # игровой цикл
 while running:
     # единица времени
     tick = clock.tick(FPS)
+
     # сторона прыжка (лево или право)
     side = None
 
     last_tile = None
     # заполняем экран белым и отрисовываем все спрайты
     screen.fill('white')
-    all_sprites.draw(screen)
+    if not lose_f:
+        all_sprites.draw(screen)
     # обновляем положение камеры
-    camera.update(player)
+    camera.update(player, lose_f)
     # пробегаемя по платформам и решаем, убивать конкретную платформу или создать новую
 
     for tile in all_tiles:
@@ -170,7 +230,7 @@ while running:
         camera.apply(sprite)
 
     text = str(camera.get_score())
-    score_rendered = fonts[-1].render(text, True, 'black')
+    score_rendered = fonts_lose[-1].render(text, True, 'black')
     screen.blit(score_rendered, (5, 5))
 
     # пробегаемся по событиям
@@ -201,9 +261,8 @@ while running:
             elif event.key in (pg.K_a, pg.K_LEFT):
                 side = 0
 
-    # передвигаем игрока в сторону
+    # передвигаем игрока в сторону и передвигаем платформы
     player.update(side)
-
     all_tiles.update()
 
     if player.get_x() > WIDTH - 45:
@@ -213,11 +272,11 @@ while running:
         player.set_x(WIDTH - 45)
 
     if player.get_y() - player.rect.height > HEIGHT:
-        texts = ['Вы проиграли!', 'Нажмите любую клавищу для перезапуска']
+        texts = ['Вы проиграли!', 'Нажмите любую клавишу для перезапуска']
         text_coord = 300
         font = 0
         for line in texts:
-            string_rendered = fonts[font].render(line, True, 'red')
+            string_rendered = fonts_lose[font].render(line, True, 'red')
             intro_rect = string_rendered.get_rect()
             text_coord += 10
             intro_rect.top = text_coord
@@ -226,6 +285,6 @@ while running:
             screen.blit(string_rendered, intro_rect)
             font += 1
         lose_f = True
-    # обновляем кадр
 
+    # обновляем кадh
     pg.display.flip()
