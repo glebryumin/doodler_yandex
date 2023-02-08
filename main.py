@@ -1,7 +1,7 @@
 import pygame as pg
 import functions as func
 from random import randint
-import os
+import socket
 
 
 # инициализация окна, шрифта, счётчика времени
@@ -14,23 +14,22 @@ fonts_start = [pg.font.Font(None, 30), pg.font.Font(None, 20), pg.font.Font(None
 clock = pg.time.Clock()
 screen = pg.display.set_mode(size)
 pg.display.set_caption('Doodle Jump')
-player_img = pg.transform.scale(func.load_image('doodler.png'), (90, 70))
+player_img = [pg.transform.scale(func.load_image('doodler.png'), (90, 70)),
+              pg.transform.scale(func.load_image('doodler_jump.png'), (90, 70))]
 all_sprites = pg.sprite.Group()
 all_tiles = pg.sprite.Group()
 all_players = pg.sprite.Group()
 max_score = 0
-myhost = os.name
-with open("data/score.csv", 'r') as f:
-    massive = f.readlines()[1:]
+myhost = socket.gethostname()
+with open("data/score.csv") as f:
+    massive = f.readlines()
     for line in massive:
         name, score = line.split(';')
         if name == myhost:
-            max_score = int(score)
-print(myhost, max_score)
-
-max_score = -10
+            max_score = max(max_score, int(score))
 running = True
 lose_f = False
+same_score_f = False
 
 
 # инициализация класса игрока
@@ -39,7 +38,7 @@ class Player(pg.sprite.Sprite):
     def __init__(self, x, y, *groups):
         super().__init__(groups)
         # подгоняем картинку под размер игрока
-        self.image = player_img
+        self.image = player_img[0]
         # выставляем размеры и позицию игрока
         self.rect = self.image.get_rect()
         self.rect.x, self.rect.y = x, y
@@ -80,9 +79,10 @@ class Player(pg.sprite.Sprite):
         # по стороне движения двигаем персонажа
         self.rect.x += self.x_speed * self.side
         if self.side == -1:
-            self.image = pg.transform.flip(pg.transform.scale(player_img, (90, 70)), True, False)
+            self.image = pg.transform.flip(pg.transform.scale(player_img[1] if self.jump else player_img[0],
+                                                              (90, 70)), True, False)
         elif self.side == 1:
-            self.image = player_img
+            self.image = player_img[1] if self.jump else player_img[0]
 
     def get_y(self):
         return self.rect.y
@@ -99,15 +99,25 @@ class Player(pg.sprite.Sprite):
 
 # инициализация класса платформы
 class Platform(pg.sprite.Sprite):
-    def __init__(self, x, y, *groups):
+    def __init__(self, x, y, moveable = 0, breakable = 0, groups=[all_tiles, all_sprites]):
         super().__init__(groups)
         self.image = pg.Surface((60, 10))
         pg.draw.rect(self.image, 'black', (0, 0, 60, 10))
         self.rect = pg.Rect(x, y, 60, 10)
-        self.moveable = True if randint(0, 10) == 1 else False
-        self.x_speed = -1 if randint(0, 10) in (1, 2, 3, 4, 5) else 1
-        self.borders = (self.rect.x - 200 if self.rect.x - 200 >= 60 else 60,
-                        self.rect.x + 200 if self.rect.x + 200 <= HEIGHT - 60 else HEIGHT - 60)
+        if moveable == 0:
+            self.moveable = True if randint(0, 10) == 1 else False
+        else:
+            self.moveable = False
+        if breakable == 0:
+            self.breakable = True if randint(0, 20) == 1 else False
+        else:
+            self.breakable = False
+        if self. moveable:
+            self.x_speed = -1 if randint(0, 10) in (1, 2, 3, 4, 5) else 1
+            self.borders = (self.rect.x - 200 if self.rect.x - 200 >= 60 else 60,
+                            self.rect.x + 200 if self.rect.x + 200 <= HEIGHT - 60 else HEIGHT - 60)
+        if self.breakable:
+            pg.draw.rect(self.image, 'red', (0, 0, 60, 10))
 
     def update(self):
         #
@@ -118,12 +128,15 @@ class Platform(pg.sprite.Sprite):
                 self.x_speed = 1
             elif self.rect.x >= self.borders[1]:
                 self.x_speed = -1
+        elif self.breakable:
+            if pg.sprite.spritecollideany(self, all_players):
+                self.kill()
 
 
 def generate_platforms():
-    Platform(175, 580, all_tiles, all_sprites)
+    Platform(175, 580, moveable=1, breakable=1)
     for i in range(20):
-        Platform(randint(0, WIDTH - 40), 580 - (80 * (i + 1)), all_tiles, all_sprites)
+        Platform(randint(0, WIDTH - 40), 580 - (50 * (i + 1)))
 
 
 def kill_platforms():
@@ -177,7 +190,7 @@ player = Player(170, 300, all_sprites, all_players)
 running_start_screen = True
 while running_start_screen:
     tick = clock.tick(FPS)
-    Platform(175, 380, all_tiles, all_sprites)
+    Platform(175, 380, moveable=1, breakable=1)
 
     screen.fill('white')
     draw_grid()
@@ -243,8 +256,8 @@ while running:
         if tile.rect.y >= HEIGHT:
             tile.kill()
         last_tile = tile
-    if last_tile.rect.y > 100:
-        Platform(randint(0, WIDTH - 60), -randint(0, 10), all_tiles, all_sprites)
+    if last_tile.rect.y > 50:
+        Platform(randint(0, WIDTH - 60), -randint(0, 5))
 
     # передвигаем все спрайты относительно игрока при помощи камеры
     for sprite in all_sprites:
@@ -252,18 +265,23 @@ while running:
 
     max_score = max(max_score, camera.get_score())
     text = str(camera.get_score())
-    score_rendered = fonts_lose[-1].render(text, True, 'green')
+    score_rendered = fonts_lose[-1].render(text, True, 'blue')
     screen.blit(score_rendered, (5, 5))
 
     # пробегаемся по событиям
     for event in pg.event.get():
         # если выход, то завершаем цикл и записываем рекорд
         if event.type == pg.QUIT:
+            # останавливаем цикл
             runnning = False
-            with open('data/score.csv', 'w', 'r') as f:
-                massive = f.readlines().append(f'{myhost};{max_score}')
-                f.writelines([i for i in massive])
-            # заканчиваем программу
+            with open('data/score.csv') as f:
+                name, score = f.readlines()[-1].split(';')
+                if name == myhost and int(score) == max_score:
+                    same_score_f = True
+            if not same_score_f:
+                with open('data/score.csv', 'a') as f:
+                    f.write(f'{myhost};{max_score}\n')
+                # заканчиваем программу
             func.terminate()
         # если кнопка нажата, то выбираем сторону движения
         if event.type == pg.KEYDOWN:
@@ -299,12 +317,12 @@ while running:
     if player.get_y() - player.rect.height > HEIGHT:
         texts = ['Вы проиграли!', 'Нажмите любую клавишу для перезапуска', f'Ваш рекорд:{camera.get_score()}',
                  f'Лучший рекорд:{max_score}']
-        text_coord = 265
+        text_coord = 220
         font = 0
         for line in texts:
             string_rendered = fonts_lose[font].render(line, True, 'red')
             intro_rect = string_rendered.get_rect()
-            text_coord += 10
+            text_coord += 30
             intro_rect.top = text_coord
             intro_rect.x = 10
             text_coord += intro_rect.height
