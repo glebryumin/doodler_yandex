@@ -1,13 +1,16 @@
 import pygame as pg
 import functions as func
 from random import randint
+import os
+
 
 # инициализация окна, шрифта, счётчика времени
 pg.init()
 size = WIDTH, HEIGHT = 300, 400
 FPS = 60
-fonts_lose = [pg.font.Font(None, 40), pg.font.Font(None, 35), pg.font.Font(None, 30)]
-fonts_start = [pg.font.Font(None, 30), pg.font.Font(None, 20)]
+fonts_lose = [pg.font.Font(None, 40), pg.font.Font(None, 35), pg.font.Font(None, 35), pg.font.Font(None, 35),
+              pg.font.Font(None, 30)]
+fonts_start = [pg.font.Font(None, 30), pg.font.Font(None, 20), pg.font.Font(None, 20), pg.font.Font(None, 20)]
 clock = pg.time.Clock()
 screen = pg.display.set_mode(size)
 pg.display.set_caption('Doodle Jump')
@@ -15,6 +18,17 @@ player_img = pg.transform.scale(func.load_image('doodler.png'), (90, 70))
 all_sprites = pg.sprite.Group()
 all_tiles = pg.sprite.Group()
 all_players = pg.sprite.Group()
+max_score = 0
+myhost = os.name
+with open("data/score.csv", 'r') as f:
+    massive = f.readlines()[1:]
+    for line in massive:
+        name, score = line.split(';')
+        if name == myhost:
+            max_score = int(score)
+print(myhost, max_score)
+
+max_score = -10
 running = True
 lose_f = False
 
@@ -150,8 +164,12 @@ class Camera:
         self.score = score
 
 
-def draw_grid():
-    pass
+def draw_grid(blocksize=50):
+    blockSize = blocksize
+    for x in range(0, WIDTH, blockSize):
+        for y in range(0, HEIGHT, blockSize):
+            rect = pg.Rect(x, y, blockSize, blockSize)
+            pg.draw.rect(screen, 'black', rect, 1)
 
 
 camera = Camera()
@@ -162,6 +180,7 @@ while running_start_screen:
     Platform(175, 380, all_tiles, all_sprites)
 
     screen.fill('white')
+    draw_grid()
     camera.update(player, lose_f)
 
     for sprite in all_sprites:
@@ -171,7 +190,7 @@ while running_start_screen:
     all_players.draw(screen)
     all_tiles.draw(screen)
 
-    texts = ['Doodle Jump', 'Нажмите любую клавишу для старта']
+    texts = ['Doodle Jump', 'Нажмите любую клавишу для старта', f'Ваш лучший рекорд:{max_score}']
     text_coord = 10
     font = 0
     for line in texts:
@@ -208,12 +227,14 @@ while running:
 
     # сторона прыжка (лево или право)
     side = None
-
+    # последняя платформа
     last_tile = None
     # заполняем экран белым и отрисовываем все спрайты
     screen.fill('white')
+    draw_grid()
     if not lose_f:
         all_sprites.draw(screen)
+
     # обновляем положение камеры
     camera.update(player, lose_f)
     # пробегаемя по платформам и решаем, убивать конкретную платформу или создать новую
@@ -229,15 +250,19 @@ while running:
     for sprite in all_sprites:
         camera.apply(sprite)
 
+    max_score = max(max_score, camera.get_score())
     text = str(camera.get_score())
-    score_rendered = fonts_lose[-1].render(text, True, 'black')
+    score_rendered = fonts_lose[-1].render(text, True, 'green')
     screen.blit(score_rendered, (5, 5))
 
     # пробегаемся по событиям
     for event in pg.event.get():
-        # если выход, то завершаем цикл
+        # если выход, то завершаем цикл и записываем рекорд
         if event.type == pg.QUIT:
             runnning = False
+            with open('data/score.csv', 'w', 'r') as f:
+                massive = f.readlines().append(f'{myhost};{max_score}')
+                f.writelines([i for i in massive])
             # заканчиваем программу
             func.terminate()
         # если кнопка нажата, то выбираем сторону движения
@@ -272,8 +297,9 @@ while running:
         player.set_x(WIDTH - 45)
 
     if player.get_y() - player.rect.height > HEIGHT:
-        texts = ['Вы проиграли!', 'Нажмите любую клавишу для перезапуска']
-        text_coord = 300
+        texts = ['Вы проиграли!', 'Нажмите любую клавишу для перезапуска', f'Ваш рекорд:{camera.get_score()}',
+                 f'Лучший рекорд:{max_score}']
+        text_coord = 265
         font = 0
         for line in texts:
             string_rendered = fonts_lose[font].render(line, True, 'red')
