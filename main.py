@@ -2,7 +2,9 @@ import pygame as pg
 import functions as func
 from random import randint
 import socket
+import os
 
+os.environ['SDL_VIDEO_WINDOW_POS'] = '450, 35'
 
 # инициализация окна, шрифта, счётчика времени
 pg.init()
@@ -15,7 +17,7 @@ clock = pg.time.Clock()
 screen = pg.display.set_mode(size)
 pg.display.set_caption('Doodle Jump')
 player_img = [pg.transform.scale(func.load_image('doodler.png'), (90, 70)),
-              pg.transform.scale(func.load_image('doodler_jump.png'), (90, 70))]
+              pg.transform.scale(func.load_image('doodler.png'), (90, 70))]
 all_sprites = pg.sprite.Group()
 all_tiles = pg.sprite.Group()
 all_players = pg.sprite.Group()
@@ -128,7 +130,7 @@ class Platform(pg.sprite.Sprite):
                 self.x_speed = 1
             elif self.rect.x >= self.borders[1]:
                 self.x_speed = -1
-        elif self.breakable:
+        if self.breakable:
             if pg.sprite.spritecollideany(self, all_players):
                 self.kill()
 
