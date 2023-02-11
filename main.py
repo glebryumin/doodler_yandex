@@ -17,7 +17,7 @@ clock = pg.time.Clock()
 screen = pg.display.set_mode(size)
 pg.display.set_caption('Doodle Jump')
 player_img = [pg.transform.scale(func.load_image('doodler.png'), (90, 70)),
-              pg.transform.scale(func.load_image('doodler.png'), (90, 70))]
+              pg.transform.scale(func.load_image('doodler_jump.png'), (90, 70))]
 all_sprites = pg.sprite.Group()
 all_tiles = pg.sprite.Group()
 all_players = pg.sprite.Group()
