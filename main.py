@@ -56,6 +56,9 @@ class Player(pg.sprite.Sprite):
         self.side = 0
         # состояние прыжка
         self.jump = False
+        #
+        self.transformed = False
+
 
     # функция обновления положения игрока
     def update(self, side):
@@ -68,6 +71,7 @@ class Player(pg.sprite.Sprite):
             # изменяем временную высоту
             self.temp_y = -10
             self.jump = True
+            self.frame = 1
         # изменяем высоту
         self.rect.y += self.temp_y
         # изменяем времменую высоту, прибавляя гравитацию
@@ -81,10 +85,29 @@ class Player(pg.sprite.Sprite):
         # по стороне движения двигаем персонажа
         self.rect.x += self.x_speed * self.side
         if self.side == -1:
-            self.image = pg.transform.flip(pg.transform.scale(player_img[1] if self.jump else player_img[0],
-                                                              (90, 70)), True, False)
+            if self.jump:
+                self.image = pg.transform.flip(pg.transform.scale(player_img[1], (90, 70)), True, False)
+            else:
+                self.image = pg.transform.flip(pg.transform.scale(player_img[0], (90, 70)), True, False)
+            self.transformed = True
         elif self.side == 1:
-            self.image = player_img[1] if self.jump else player_img[0]
+            if self.jump:
+                self.image = player_img[1]
+            else:
+                self.image = player_img[0]
+            self.transformed = False
+        else:
+            if self.transformed:
+                if self.jump:
+                    self.image = pg.transform.flip(pg.transform.scale(player_img[1], (90, 70)), True, False)
+                else:
+                    self.image = pg.transform.flip(pg.transform.scale(player_img[0], (90, 70)), True, False)
+            else:
+                if self.jump:
+                    self.image = player_img[1]
+                else:
+                    self.image = player_img[0]
+
 
     def get_y(self):
         return self.rect.y
@@ -259,7 +282,14 @@ while running:
             tile.kill()
         last_tile = tile
     if last_tile.rect.y > 50:
-        Platform(randint(0, WIDTH - 60), -randint(0, 5))
+        x, y = randint(0, WIDTH - 60), -randint(0, 5)
+        Platform(x, y)
+        if all_tiles.sprites()[-1].breakable:
+            x1 = randint(0, WIDTH - 60)
+            while x < x1 < x + 60 or x - 60 < x1 < x:
+                x1 = randint(0, WIDTH - 60)
+            Platform(x1, y, moveable=all_tiles.sprites()[-1].moveable, breakable=1,
+                     groups=all_tiles.sprites()[-1].groups())
 
     # передвигаем все спрайты относительно игрока при помощи камеры
     for sprite in all_sprites:
