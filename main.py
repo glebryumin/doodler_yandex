@@ -16,8 +16,11 @@ fonts_start = [pg.font.Font(None, 30), pg.font.Font(None, 20), pg.font.Font(None
 clock = pg.time.Clock()
 screen = pg.display.set_mode(size)
 pg.display.set_caption('Doodle Jump')
-player_img = [pg.transform.scale(func.load_image('doodler.png'), (90, 70)),
-              pg.transform.scale(func.load_image('doodler_jump.png'), (90, 70))]
+player_img = {'normal': pg.transform.scale(func.load_image('doodler.png'), (90, 70)),
+              'jump': pg.transform.scale(func.load_image('doodler_jump.png'), (90, 70))}
+platform_images = {'normal': pg.transform.scale(func.load_image('normal.png'), (60, 10)),
+                   'moving': pg.transform.scale(func.load_image('moving.png'), (60, 10)),
+                   'breaking': pg.transform.scale(func.load_image('breaking.png'), (60, 10))}
 all_sprites = pg.sprite.Group()
 all_tiles = pg.sprite.Group()
 all_players = pg.sprite.Group()
@@ -32,6 +35,8 @@ with open("data/score.csv") as f:
 running = True
 lose_f = False
 same_score_f = False
+lose = pg.mixer.Sound('data/sounds/pada.wav')
+single_use = False
 
 
 # инициализация класса игрока
@@ -40,7 +45,7 @@ class Player(pg.sprite.Sprite):
     def __init__(self, x, y, *groups):
         super().__init__(groups)
         # подгоняем картинку под размер игрока
-        self.image = player_img[0]
+        self.image = player_img['normal']
         # выставляем размеры и позицию игрока
         self.rect = self.image.get_rect()
         self.rect.x, self.rect.y = x, y
@@ -58,7 +63,8 @@ class Player(pg.sprite.Sprite):
         self.jump = False
         #
         self.transformed = False
-
+        #
+        self.jump_sound = pg.mixer.Sound("data/sounds/jump.wav")
 
     # функция обновления положения игрока
     def update(self, side):
@@ -71,7 +77,7 @@ class Player(pg.sprite.Sprite):
             # изменяем временную высоту
             self.temp_y = -10
             self.jump = True
-            self.frame = 1
+            self.jump_sound.play()
         # изменяем высоту
         self.rect.y += self.temp_y
         # изменяем времменую высоту, прибавляя гравитацию
@@ -86,28 +92,27 @@ class Player(pg.sprite.Sprite):
         self.rect.x += self.x_speed * self.side
         if self.side == -1:
             if self.jump:
-                self.image = pg.transform.flip(pg.transform.scale(player_img[1], (90, 70)), True, False)
+                self.image = pg.transform.flip(pg.transform.scale(player_img['jump'], (90, 70)), True, False)
             else:
-                self.image = pg.transform.flip(pg.transform.scale(player_img[0], (90, 70)), True, False)
+                self.image = pg.transform.flip(pg.transform.scale(player_img['normal'], (90, 70)), True, False)
             self.transformed = True
         elif self.side == 1:
             if self.jump:
-                self.image = player_img[1]
+                self.image = player_img['jump']
             else:
-                self.image = player_img[0]
+                self.image = player_img['normal']
             self.transformed = False
         else:
             if self.transformed:
                 if self.jump:
-                    self.image = pg.transform.flip(pg.transform.scale(player_img[1], (90, 70)), True, False)
+                    self.image = pg.transform.flip(pg.transform.scale(player_img['jump'], (90, 70)), True, False)
                 else:
-                    self.image = pg.transform.flip(pg.transform.scale(player_img[0], (90, 70)), True, False)
+                    self.image = pg.transform.flip(pg.transform.scale(player_img['normal'], (90, 70)), True, False)
             else:
                 if self.jump:
-                    self.image = player_img[1]
+                    self.image = player_img['jump']
                 else:
-                    self.image = player_img[0]
-
+                    self.image = player_img['normal']
 
     def get_y(self):
         return self.rect.y
@@ -124,11 +129,12 @@ class Player(pg.sprite.Sprite):
 
 # инициализация класса платформы
 class Platform(pg.sprite.Sprite):
-    def __init__(self, x, y, moveable = 0, breakable = 0, groups=[all_tiles, all_sprites]):
+    def __init__(self, x, y, moveable=0, breakable=0, groups=[all_tiles, all_sprites]):
         super().__init__(groups)
         self.image = pg.Surface((60, 10))
         pg.draw.rect(self.image, 'black', (0, 0, 60, 10))
         self.rect = pg.Rect(x, y, 60, 10)
+        self.image = platform_images['normal']
         if moveable == 0:
             self.moveable = True if randint(0, 10) == 1 else False
         else:
@@ -137,12 +143,13 @@ class Platform(pg.sprite.Sprite):
             self.breakable = True if randint(0, 20) == 1 else False
         else:
             self.breakable = False
-        if self. moveable:
+        if self.moveable:
+            self.image = platform_images['moving']
             self.x_speed = -1 if randint(0, 10) in (1, 2, 3, 4, 5) else 1
             self.borders = (self.rect.x - 200 if self.rect.x - 200 >= 60 else 60,
                             self.rect.x + 200 if self.rect.x + 200 <= HEIGHT - 60 else HEIGHT - 60)
         if self.breakable:
-            pg.draw.rect(self.image, 'red', (0, 0, 60, 10))
+            self.image = platform_images['breaking']
 
     def update(self):
         #
@@ -154,8 +161,11 @@ class Platform(pg.sprite.Sprite):
             elif self.rect.x >= self.borders[1]:
                 self.x_speed = -1
         if self.breakable:
-            if pg.sprite.spritecollideany(self, all_players):
-                self.kill()
+            player_collided = pg.sprite.spritecollideany(self, all_players)
+            if player_collided \
+                    and pg.sprite.collide_mask(self, player_collided) and not all_players.sprites()[0].jump \
+                    and -15 <= self.rect.y - (player_collided.rect.y + player_collided.rect.height) <= 15:
+                self.rect = pg.Rect(self.rect.x, self.rect.y, 0, 0)
 
 
 def generate_platforms():
@@ -188,10 +198,10 @@ class Camera:
     # позиционировать камеру на объекте target
     def update(self, target, lose_f):
         self.dy = -(target.rect.y + target.rect.h // 2 - HEIGHT // 2)
-        if self.dy < 0:
+        if self.dy < 0 and not lose_f:
             self.dy = 0
         elif lose_f:
-            self.dy = -10000
+            self.dy = -20
         else:
             self.score += self.dy
 
@@ -270,8 +280,8 @@ while running:
     # заполняем экран белым и отрисовываем все спрайты
     screen.fill('white')
     draw_grid()
-    if not lose_f:
-        all_sprites.draw(screen)
+
+    all_sprites.draw(screen)
 
     # обновляем положение камеры
     camera.update(player, lose_f)
@@ -325,6 +335,7 @@ while running:
                 camera.set_score(0)
                 kill_platforms()
                 lose_f = False
+                single_use = False
                 player.set_y(500)
                 player.set_x(170)
                 player.temp_y = 0
@@ -347,6 +358,9 @@ while running:
         player.set_x(WIDTH - 45)
 
     if player.get_y() - player.rect.height > HEIGHT:
+        if not single_use:
+            lose.play()
+            single_use = True
         texts = ['Вы проиграли!', 'Нажмите любую клавишу для перезапуска', f'Ваш рекорд:{camera.get_score()}',
                  f'Лучший рекорд:{max_score}']
         text_coord = 220
