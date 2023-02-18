@@ -1,14 +1,16 @@
 import pygame as pg
 import functions as func
-from random import randint
+from random import randint, choice
 import socket
 import os
+
 
 os.environ['SDL_VIDEO_WINDOW_POS'] = '450, 35'
 
 # инициализация окна, шрифта, счётчика времени
 pg.init()
 size = WIDTH, HEIGHT = 300, 400
+screen_rect = (0, 0, WIDTH, HEIGHT)
 FPS = 60
 fonts_lose = [pg.font.Font(None, 40), pg.font.Font(None, 35), pg.font.Font(None, 35), pg.font.Font(None, 35),
               pg.font.Font(None, 30)]
@@ -16,14 +18,18 @@ fonts_start = [pg.font.Font(None, 30), pg.font.Font(None, 20), pg.font.Font(None
 clock = pg.time.Clock()
 screen = pg.display.set_mode(size)
 pg.display.set_caption('Doodle Jump')
+pg.display.set_icon(func.load_image('icon.png'))
 player_img = {'normal': pg.transform.scale(func.load_image('doodler.png'), (90, 70)),
               'jump': pg.transform.scale(func.load_image('doodler_jump.png'), (90, 70))}
-platform_images = {'normal': pg.transform.scale(func.load_image('normal.png'), (60, 10)),
-                   'moving': pg.transform.scale(func.load_image('moving.png'), (60, 10)),
-                   'breaking': pg.transform.scale(func.load_image('breaking.png'), (60, 10))}
+platform_images = {'normal': pg.transform.scale(func.load_image('normal.jpg'), (60, 10)),
+                   'moving': pg.transform.scale(func.load_image('moving.jpg'), (60, 10)),
+                   'breaking': pg.transform.scale(func.load_image('breaking.jpg'), (60, 10))}
+particles_images = {'left': func.load_image("broke_left.png"),
+                    'right': func.load_image('broke_right.png')}
 all_sprites = pg.sprite.Group()
 all_tiles = pg.sprite.Group()
 all_players = pg.sprite.Group()
+all_particles = pg.sprite.Group()
 max_score = 0
 myhost = socket.gethostname()
 with open("data/score.csv") as f:
@@ -36,6 +42,7 @@ running = True
 lose_f = False
 same_score_f = False
 lose = pg.mixer.Sound('data/sounds/pada.wav')
+broke = pg.mixer.Sound('data/sounds/lomise.wav')
 single_use = False
 
 
@@ -166,6 +173,35 @@ class Platform(pg.sprite.Sprite):
                     and pg.sprite.collide_mask(self, player_collided) and not all_players.sprites()[0].jump \
                     and -15 <= self.rect.y - (player_collided.rect.y + player_collided.rect.height) <= 15:
                 self.rect = pg.Rect(self.rect.x, self.rect.y, 0, 0)
+                self.image = pg.Surface((0, 10))
+                broke.play()
+                Particle((self.rect.x, self.rect.y), randint(1, 5) * choice([1, -1]),
+                         randint(1, 5) * choice([1, -1]), 'left')
+                Particle((self.rect.x, self.rect.y), randint(1, 5) * choice([1, -1]),
+                         randint(1, 5) * choice([1, -1]), 'right')
+
+
+class Particle(pg.sprite.Sprite):
+    def __init__(self, pos, dx, dy, part):
+        super().__init__(all_particles, all_sprites)
+        self.image = particles_images[part]
+        self.rect = self.image.get_rect()
+        # у каждой частицы своя скорость — это вектор
+        self.velocity = [dx, dy]
+        # и свои координаты
+        self.rect.x, self.rect.y = pos
+        # гравитация будет одинаковой
+        self.gravity = 0.4
+
+    def update(self):
+        # применяем гравитационный эффект:
+        # движение с ускорением под действием гравитации
+        self.velocity[1] += self.gravity
+        # перемещаем частицу
+        self.rect.x += self.velocity[0]
+        self.rect.y += self.velocity[1]
+        if not self.rect.colliderect(screen_rect):
+            self.kill()
 
 
 def generate_platforms():
@@ -264,6 +300,7 @@ kill_player()
 kill_platforms()
 WIDTH, HEIGHT = 550, 700
 size = WIDTH, HEIGHT
+screen_rect = (0, 0, WIDTH, HEIGHT)
 pg.display.set_mode(size)
 player = Player(170, 500, all_sprites, all_players)
 camera = Camera()
@@ -282,28 +319,28 @@ while running:
     draw_grid()
 
     all_sprites.draw(screen)
+    all_particles.draw(screen)
 
     # обновляем положение камеры
     camera.update(player, lose_f)
     # пробегаемя по платформам и решаем, убивать конкретную платформу или создать новую
-
-    for tile in all_tiles:
-        if tile.rect.y >= HEIGHT:
-            tile.kill()
-        last_tile = tile
-    if last_tile.rect.y > 50:
-        x, y = randint(0, WIDTH - 60), -randint(0, 5)
-        Platform(x, y)
-        if all_tiles.sprites()[-1].breakable:
-            x1 = randint(0, WIDTH - 60)
-            while x < x1 < x + 60 or x - 60 < x1 < x:
+    if len(all_tiles.sprites()) > 0:
+        last_tile = all_tiles.sprites()[-1]
+        if last_tile.rect.y > 50:
+            x, y = randint(0, WIDTH - 60), -randint(0, 5)
+            Platform(x, y)
+            if all_tiles.sprites()[-1].breakable:
                 x1 = randint(0, WIDTH - 60)
-            Platform(x1, y, moveable=all_tiles.sprites()[-1].moveable, breakable=1,
-                     groups=all_tiles.sprites()[-1].groups())
+                while x < x1 < x + 60 or x - 60 < x1 < x:
+                    x1 = randint(0, WIDTH - 60)
+                Platform(x1, y, moveable=all_tiles.sprites()[-1].moveable, breakable=1,
+                         groups=all_tiles.sprites()[-1].groups())
 
     # передвигаем все спрайты относительно игрока при помощи камеры
     for sprite in all_sprites:
         camera.apply(sprite)
+        if not sprite.rect.colliderect(screen_rect):
+            sprite.kill()
 
     max_score = max(max_score, camera.get_score())
     text = str(camera.get_score())
@@ -336,9 +373,7 @@ while running:
                 kill_platforms()
                 lose_f = False
                 single_use = False
-                player.set_y(500)
-                player.set_x(170)
-                player.temp_y = 0
+                player = Player(170, 500, all_sprites, all_players)
                 generate_platforms()
         # если кнопка отжата, то приравниваем сторону к нулю
         if event.type == pg.KEYUP:
@@ -350,6 +385,7 @@ while running:
     # передвигаем игрока в сторону и передвигаем платформы
     player.update(side)
     all_tiles.update()
+    all_particles.update()
 
     if player.get_x() > WIDTH - 45:
         player.set_x(-45)
